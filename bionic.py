@@ -1,9 +1,9 @@
-import streamlit as st
 import tempfile
 import re
 from tqdm import tqdm
 from pathlib import Path
 import subprocess
+import argparse
 
 # Install beautifulsoup4 and ebooklib packages
 subprocess.run(["pip", "install", "beautifulsoup4", "ebooklib"])
@@ -45,58 +45,26 @@ def convert_to_bionic(content: str):
                             child.replace_with(convert_to_bionic_str(soup, child.text))
     return str(soup).encode()
 
-def convert_book(book_path, original_name):
+def convert_book(book_path):
+    original_name = Path(book_path).name
     source = epub.read_epub(book_path)
-    total_items = len(list(source.items))
-    progress_bar = st.progress(0)
     
-    for i, item in enumerate(source.items):
+    for item in tqdm(source.items, desc="Converting to Bionic"):
         if item.media_type == "application/xhtml+xml":
             content = item.content.decode('utf-8')
             item.content = convert_to_bionic(content)
-        progress_bar.progress((i + 1) / total_items)
     
     converted_path = _convert_file_path(book_path, original_name)
     epub.write_epub(converted_path, source)
     
-    with open(converted_path, "rb") as f:
-        converted_data = f.read()
-    
-    return converted_data, Path(converted_path).name
+    print(f"Conversion completed! File saved as {converted_path}")
 
 def main():
-    st.title("Convert your EPUB to Bionic")
-    book_path = st.file_uploader("Upload a book file", type=["epub"])
-
-    if book_path is not None:
-        original_name = book_path.name
-        with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
-            tmp_file.write(book_path.read())
-            tmp_file_path = tmp_file.name
-
-        # Check if the uploaded book is different from the previous one
-        if 'original_name' not in st.session_state or st.session_state.original_name != original_name:
-            # Clear the session state if the book is different
-            st.session_state.clear()
-
-        # Perform the conversion only if the converted data is not already in the session state
-        if 'converted_data' not in st.session_state:
-            with st.spinner("Processing the file..."):
-                st.session_state.converted_data, st.session_state.converted_name = convert_book(tmp_file_path, original_name)
-            st.success("Conversion completed!")
-
-        # Display the download button using the converted data from the session state
-        converted_data = st.session_state.converted_data
-        converted_name = st.session_state.converted_name
-        st.download_button(
-            label="Download Converted Book",
-            data=converted_data,
-            file_name=converted_name,
-            mime="application/epub+zip"
-        )
-
-        # Store the original name of the uploaded book in the session state
-        st.session_state.original_name = original_name
+    parser = argparse.ArgumentParser(description="Convert an EPUB file to a Bionic Reading-like format.")
+    parser.add_argument("book_path", help="The path to the EPUB file to convert.")
+    args = parser.parse_args()
+    
+    convert_book(args.book_path)
 
 if __name__ == "__main__":
     main()
