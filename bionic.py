@@ -1,3 +1,4 @@
+#!/bin/env python3
 import re
 from tqdm import tqdm
 from pathlib import Path
@@ -6,6 +7,7 @@ import argparse
 from bs4 import BeautifulSoup
 import bs4
 from ebooklib import epub
+import uuid
 
 
 def _convert_file_path(path, original_name):
@@ -47,6 +49,14 @@ def convert_to_bionic(content: str):
 def convert_book(book_path):
     original_name = Path(book_path).name
     source = epub.read_epub(book_path)
+
+    identifier = source.get_metadata('DC', 'identifier')
+    if identifier:
+        source.uid = identifier[0][0]
+    else:
+        uid = str(uuid.uuid4())
+        source.set_identifier(uid)
+        source.uid = uid
 
     for item in tqdm(source.items, desc="Converting to Bionic"):
         if item.media_type == "application/xhtml+xml":
